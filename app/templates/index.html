@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .upload-section {
+            margin-bottom: 20px;
+        }
+        .stats-section {
+            margin-top: 20px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Emotion Detection from Video</h1>
+        <div class="upload-section">
+            <h2>Upload Video</h2>
+            <input type="file" id="videoFile" accept="video/*">
+            <button onclick="uploadVideo()">Upload and Process</button>
+        </div>
+        <div class="stats-section">
+            <h2>Statistics</h2>
+            <pre id="statsOutput"></pre>
+        </div>
+    </div>
+
+    <script>
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoFile');
+            const statsOutput = document.getElementById('statsOutput');
+
+            if (fileInput.files.length === 0) {
+                alert("Please select a video file.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    const statsResponse = await fetch(`/stats/${result.stats_folder.split('/').pop()}`);
+                    const stats = await statsResponse.json();
+                    statsOutput.textContent = JSON.stringify(stats, null, 2);
+                } else {
+                    statsOutput.textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                statsOutput.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
