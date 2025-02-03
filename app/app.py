@@ -1,14 +1,19 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, Response
 import os
+import base64
+import cv2
 from utils.emotion_detection import process_video
+from utils.generative_ai import train_generative_model, generate_synthetic_image
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['STATS_FOLDER'] = 'emotion_stats'
+app.config['GENAI_FOLDER'] = 'generative_ai_data'
 
-# Ensure upload and stats folders exist
+# Ensure upload, stats, and generative AI folders exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['STATS_FOLDER'], exist_ok=True)
+os.makedirs(app.config['GENAI_FOLDER'], exist_ok=True)
 
 @app.route('/')
 def index():
@@ -27,16 +32,49 @@ def upload_video():
     video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_file.filename)
     video_file.save(video_path)
 
-    # Process the video
+    # Get frame interval from the UI
+    frame_interval = int(request.form.get('frame_interval', 5))
+
+    # Process the video and persist frame data
     stats_folder = os.path.join(app.config['STATS_FOLDER'], os.path.splitext(video_file.filename)[0])
-    process_video(video_path, stats_folder)
+    os.makedirs(stats_folder, exist_ok=True)
+    process_video(video_path, stats_folder, frame_interval)
 
     return jsonify({"message": "Video processed successfully", "stats_folder": stats_folder})
 
-@app.route('/stats/<filename>')
-def get_stats(filename):
-    stats_folder = os.path.join(app.config['STATS_FOLDER'], filename)
-    if not os.path.exists(stats_folder):
+@app.route('/video_feed')
+def video_feed():
+    video_path = request.args.get('video_path')
+    frame_interval = int(request.args.get('frame_interval', 5))
+
+    def generate_frames():
+        cap = cv2.VideoCapture(video_path)
+        frame_count = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame_count += 1
+            if frame_count % frame_interval != 0:
+                continue
+
+            # Encode the frame in JPEG format
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+
+            # Yield the frame in byte format
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+        cap.release()
+
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/get_stats', methods=['GET'])
+def get_stats():
+    stats_folder = request.args.get('stats_folder')
+    if not stats_folder or not os.path.exists(stats_folder):
         return jsonify({"error": "Statistics not found"}), 404
 
     # Load and return the statistics

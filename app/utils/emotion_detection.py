@@ -1,12 +1,13 @@
 import cv2
 import os
 import json
+import base64
 import numpy as np
 from deepface import DeepFace
 from retinaface import RetinaFace
 from collections import defaultdict
 
-def process_video(video_path, output_folder):
+def process_video(video_path, output_folder, frame_interval=5):
     # Open the video file
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -23,6 +24,10 @@ def process_video(video_path, output_folder):
             break
 
         frame_count += 1
+
+        # Process only every nth frame
+        if frame_count % frame_interval != 0:
+            continue
 
         # Detect faces using RetinaFace
         faces = RetinaFace.detect_faces(frame)
@@ -48,7 +53,8 @@ def process_video(video_path, output_folder):
                             "total_frames": 0,
                             "emotion_counts": defaultdict(int),
                             "emotion_confidences": defaultdict(list),
-                            "embeddings": []
+                            "embeddings": [],
+                            "thumbnails": []
                         }
 
                     # Update face statistics
@@ -57,6 +63,10 @@ def process_video(video_path, output_folder):
                     for emotion, score in emotion_scores.items():
                         face_stats[face_id]["emotion_confidences"][emotion].append(score)
                     face_stats[face_id]["embeddings"].append(emotion_scores)
+
+                    # Save the face thumbnail as a base64-encoded image
+                    _, buffer = cv2.imencode('.jpg', face_region)
+                    face_stats[face_id]["thumbnails"].append(base64.b64encode(buffer).decode('utf-8'))
                 except Exception as e:
                     print(f"Error analyzing face: {e}")
 
@@ -80,7 +90,8 @@ def process_video(video_path, output_folder):
             "emotion_counts": dict(stats["emotion_counts"]),
             "average_confidences": avg_confidences,
             "probabilistic_embeddings_shape": (len(stats["embeddings"]), len(stats["embeddings"][0])),
-            "embedding_example": stats["embeddings"][0]  # Example embedding from the first frame
+            "embedding_example": stats["embeddings"][0],  # Example embedding from the first frame
+            "thumbnails": stats["thumbnails"]  # List of base64-encoded thumbnails
         }
 
         # Save statistics to a JSON file

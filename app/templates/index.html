@@ -25,6 +25,18 @@
             border-radius: 5px;
             overflow-x: auto;
         }
+        video {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+        .face-stats {
+            margin-top: 20px;
+        }
+        .face-stats img {
+            max-width: 100px;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -33,18 +45,28 @@
         <div class="upload-section">
             <h2>Upload Video</h2>
             <input type="file" id="videoFile" accept="video/*">
+            <label for="frameInterval">Frame Interval:</label>
+            <input type="number" id="frameInterval" value="5" min="1">
             <button onclick="uploadVideo()">Upload and Process</button>
+        </div>
+        <div class="video-section">
+            <h2>Video Preview</h2>
+            <video id="videoPlayer" controls></video>
         </div>
         <div class="stats-section">
             <h2>Statistics</h2>
-            <pre id="statsOutput"></pre>
+            <div id="statsOutput"></div>
         </div>
     </div>
 
     <script>
+        let videoBlob;
+
         async function uploadVideo() {
             const fileInput = document.getElementById('videoFile');
+            const frameInterval = document.getElementById('frameInterval').value;
             const statsOutput = document.getElementById('statsOutput');
+            const videoPlayer = document.getElementById('videoPlayer');
 
             if (fileInput.files.length === 0) {
                 alert("Please select a video file.");
@@ -53,6 +75,7 @@
 
             const formData = new FormData();
             formData.append('video', fileInput.files[0]);
+            formData.append('frame_interval', frameInterval);
 
             try {
                 const response = await fetch('/upload', {
@@ -62,14 +85,43 @@
 
                 const result = await response.json();
                 if (response.ok) {
-                    const statsResponse = await fetch(`/stats/${result.stats_folder.split('/').pop()}`);
+                    // Display the video
+                    videoBlob = new Blob([fileInput.files[0]], { type: 'video/mp4' });
+                    videoPlayer.src = URL.createObjectURL(videoBlob);
+
+                    // Fetch and display statistics
+                    const statsResponse = await fetch(`/get_stats?stats_folder=${result.stats_folder}`);
                     const stats = await statsResponse.json();
-                    statsOutput.textContent = JSON.stringify(stats, null, 2);
+                    displayStats(stats);
                 } else {
                     statsOutput.textContent = `Error: ${result.error}`;
                 }
             } catch (error) {
                 statsOutput.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function displayStats(stats) {
+            const statsOutput = document.getElementById('statsOutput');
+            statsOutput.innerHTML = '';
+
+            for (const [faceId, data] of Object.entries(stats)) {
+                const faceStats = document.createElement('div');
+                faceStats.className = 'face-stats';
+
+                // Display thumbnail
+                if (data.thumbnails && data.thumbnails.length > 0) {
+                    const thumbnail = document.createElement('img');
+                    thumbnail.src = `data:image/jpeg;base64,${data.thumbnails[0]}`;
+                    faceStats.appendChild(thumbnail);
+                }
+
+                // Display stats
+                const statsText = document.createElement('pre');
+                statsText.textContent = JSON.stringify(data, null, 2);
+                faceStats.appendChild(statsText);
+
+                statsOutput.appendChild(faceStats);
             }
         }
     </script>
