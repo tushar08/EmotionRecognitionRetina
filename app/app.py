@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, Response
 import os
 import base64
+import json
 import cv2
 from utils.emotion_detection import process_video
 from utils.generative_ai import train_generative_model, generate_synthetic_image
