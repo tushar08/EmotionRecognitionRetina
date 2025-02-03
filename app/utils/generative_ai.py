@@ -13,12 +13,12 @@ def train_generative_model(data_folder):
     # For now, just return the model path
     return model_path
 
-def generate_synthetic_image(prompt):
+def generate_synthetic_image(prompt, model_name='stabilityai/stable-diffusion-2'):
     """
     Generate a synthetic image using a generative AI model.
     """
-    # Load a generative model (e.g., Stable Diffusion)
-    generator = pipeline("text-to-image", model="stabilityai/stable-diffusion-2")
+    # Load the specified generative model
+    generator = pipeline("text-to-image", model=model_name)
 
     # Generate the synthetic image
     synthetic_image = generator(prompt)
