@@ -42,15 +42,17 @@
 <body>
     <div class="container">
         <h1>Emotion Detection from Video</h1>
-        <div class="login-section">
-            <h2>Hugging Face Login</h2>
-            <input type="text" id="hfToken" placeholder="Enter Hugging Face Token">
-            <button onclick="loginHuggingFace()">Login</button>
-        </div>
+        
         <div class="upload-section">
-            <h2>Upload or Record Video</h2>
+            <h2>Upload Video</h2>
             <input type="file" id="videoFile" accept="video/*">
             <button onclick="uploadVideo()">Upload Video</button>
+            <label for="frameInterval">Frame Interval:</label>
+            <input type="number" id="frameInterval" value="30" min="1">
+        </div>
+        <div class="webcam-section">
+            <h2>Record Video</h2>
+            <input type="file" id="videoFile" accept="video/*">
             <button onclick="startRecording()">Record Video via Webcam</button>
             <button onclick="stopRecording()">Stop Recording</button>
             <label for="frameInterval">Frame Interval:</label>
@@ -62,16 +64,21 @@
             <video id="videoPlayer" controls style="display: none;"></video>
             <button onclick="saveFrame()">Save Frame for Generative AI</button>
         </div>
+        <div class="stats-section">
+            <h2>Statistics</h2>
+            <div id="statsOutput"></div>
+        </div>
+        <div class="login-section">
+            <h2>Hugging Face Login</h2>
+            <input type="text" id="hfToken" placeholder="Enter Hugging Face Token">
+            <button onclick="loginHuggingFace()">Login</button>
+        </div>
         <div class="generative-ai-section">
             <h2>Generative AI</h2>
             <button onclick="trainModel()">Train Generative Model</button>
             <input type="text" id="modelName" placeholder="Enter model name (e.g., stabilityai/stable-diffusion-2)">
             <input type="text" id="promptInput" placeholder="Enter a prompt (e.g., 'A happy face')">
             <button onclick="generateImage()">Generate Synthetic Image</button>
-        </div>
-        <div class="stats-section">
-            <h2>Statistics</h2>
-            <div id="statsOutput"></div>
         </div>
     </div>
 
@@ -243,6 +250,36 @@
             }
         }
 
+        // async function saveFrame() {
+        //     const videoPlayer = document.getElementById('videoPlayer');
+        //     const canvas = document.createElement('canvas');
+        //     canvas.width = videoPlayer.videoWidth;
+        //     canvas.height = videoPlayer.videoHeight;
+        //     const ctx = canvas.getContext('2d');
+        //     ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+
+        //     const frameData = canvas.toDataURL('image/jpeg').split(',')[1];
+
+        //     try {
+        //         const response = await fetch('/save_frame', {
+        //             method: 'POST',
+        //             headers: {
+        //                 'Content-Type': 'application/json'
+        //             },
+        //             body: JSON.stringify({ frame_data: frameData })
+        //         });
+
+        //         const result = await response.json();
+        //         if (response.ok) {
+        //             alert(`Frame saved successfully: ${result.frame_path}`);
+        //         } else {
+        //             alert(`Error: ${result.error}`);
+        //         }
+        //     } catch (error) {
+        //         alert(`Error: ${error.message}`);
+        //     }
+        // }
+
         async function saveFrame() {
             const videoPlayer = document.getElementById('videoPlayer');
             const canvas = document.createElement('canvas');
@@ -251,7 +288,8 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
 
-            const frameData = canvas.toDataURL('image/jpeg').split(',')[1];
+            // Convert the canvas image to a base64-encoded string
+            const frameData = canvas.toDataURL('image/jpeg');
 
             try {
                 const response = await fetch('/save_frame', {
@@ -293,6 +331,16 @@
         async function generateImage() {
             const modelName = document.getElementById('modelName').value;
             const prompt = document.getElementById('promptInput').value;
+
+            if (!modelName) {
+                alert("Please enter a valid model name.");
+                return;
+            }
+
+            if (!prompt) {
+                alert("Please enter a prompt.");
+                return;
+            }
 
             try {
                 const response = await fetch('/generate_synthetic_image', {

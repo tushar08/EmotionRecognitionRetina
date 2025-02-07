@@ -1,4 +1,5 @@
-from transformers import pipeline
+from diffusers import StableDiffusionPipeline
+import torch
 import os
 
 def train_generative_model(data_folder):
@@ -13,18 +14,30 @@ def train_generative_model(data_folder):
     # For now, just return the model path
     return model_path
 
+from diffusers import StableDiffusionPipeline
+import torch
+import os
+
 def generate_synthetic_image(prompt, model_name='stabilityai/stable-diffusion-2'):
     """
     Generate a synthetic image using a generative AI model.
     """
-    # Load the specified generative model
-    generator = pipeline("text-to-image", model=model_name)
+    try:
+        # Check if a GPU is available
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        torch_dtype = torch.float16 if device == "cuda" else torch.float32
 
-    # Generate the synthetic image
-    synthetic_image = generator(prompt)
+        # Load the Stable Diffusion pipeline
+        pipe = StableDiffusionPipeline.from_pretrained(model_name, torch_dtype=torch_dtype)
+        pipe = pipe.to(device)
 
-    # Save the generated image
-    output_path = os.path.join('generative_ai_data', 'synthetic_image.jpg')
-    synthetic_image[0].save(output_path)
+        # Generate the synthetic image
+        image = pipe(prompt).images[0]
 
-    return output_path
+        # Save the generated image
+        output_path = os.path.join('generative_ai_data', 'synthetic_image.png')
+        image.save(output_path)
+
+        return output_path
+    except Exception as e:
+        raise ValueError(f"Error generating synthetic image: {str(e)}")

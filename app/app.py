@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, jsonify, Response
 import os
 import base64
-import cv2
 import json
+import cv2
 from utils.emotion_detection import process_video
 from utils.generative_ai import train_generative_model, generate_synthetic_image
 from huggingface_hub import login
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -60,32 +62,6 @@ def upload_video():
 
     return jsonify({"message": "Video processed successfully", "stats_folder": stats_folder})
 
-@app.route('/record_video', methods=['POST'])
-def record_video():
-    # Capture video from webcam
-    video_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webcam_video.mp4')
-    cap = cv2.VideoCapture(0)
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(video_path, fourcc, 20.0, (640, 480))
-
-    # Record for 10 seconds (adjust as needed)
-    start_time = cv2.getTickCount()
-    while (cv2.getTickCount() - start_time) / cv2.getTickFrequency() < 10:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        out.write(frame)
-
-    cap.release()
-    out.release()
-
-    # Process the recorded video
-    stats_folder = os.path.join(app.config['STATS_FOLDER'], 'webcam_video')
-    os.makedirs(stats_folder, exist_ok=True)
-    process_video(video_path, stats_folder, frame_interval=5)
-
-    return jsonify({"message": "Video recorded and processed successfully", "stats_folder": stats_folder})
-
 @app.route('/video_feed')
 def video_feed():
     video_path = request.args.get('video_path')
@@ -115,15 +91,53 @@ def video_feed():
 
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+# @app.route('/save_frame', methods=['POST'])
+# def save_frame():
+#     frame_data = request.json.get('frame_data')
+#     frame_path = os.path.join(app.config['GENAI_FOLDER'], 'saved_frame.jpg')
+
+#     with open(frame_path, 'wb') as f:
+#         f.write(frame_data)
+
+#     return jsonify({"message": "Frame saved successfully", "frame_path": frame_path})
+
 @app.route('/save_frame', methods=['POST'])
 def save_frame():
     frame_data = request.json.get('frame_data')
-    frame_path = os.path.join(app.config['GENAI_FOLDER'], 'saved_frame.jpg')
+    logging.debug(f"Received frame data: {frame_data[:100]}...")  # Log first 100 characters
+    if not frame_data:
+        return jsonify({"error": "No frame data provided"}), 400
 
-    with open(frame_path, 'wb') as f:
-        f.write(frame_data)
+    try:
+        # Decode the base64 string into bytes
+        frame_bytes = base64.b64decode(frame_data.split(',')[1])
 
-    return jsonify({"message": "Frame saved successfully", "frame_path": frame_path})
+        # Save the frame as an image file
+        frame_path = os.path.join(app.config['GENAI_FOLDER'], 'saved_frame.jpg')
+        with open(frame_path, 'wb') as f:
+            f.write(frame_bytes)
+
+        return jsonify({"message": "Frame saved successfully", "frame_path": frame_path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/get_stats', methods=['GET'])
+def get_stats():
+    stats_folder = request.args.get('stats_folder')
+    if not stats_folder or not os.path.exists(stats_folder):
+        return jsonify({"error": "Statistics folder not found"}), 404
+
+    try:
+        # Load and return the statistics
+        stats_files = [f for f in os.listdir(stats_folder) if f.endswith('.json')]
+        stats = {}
+        for stats_file in stats_files:
+            with open(os.path.join(stats_folder, stats_file), 'r') as f:
+                stats[stats_file] = json.load(f)
+
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/train_generative_model', methods=['POST'])
 def train_model():
@@ -137,9 +151,15 @@ def train_model():
 @app.route('/generate_synthetic_image', methods=['POST'])
 def generate_image():
     try:
-        # Get the model name from the request
-        model_name = request.json.get('model_name', 'stabilityai/stable-diffusion-2')
-        prompt = request.json.get('prompt', 'A realistic face showing happiness')
+        # Get the model name and prompt from the request
+        model_name = request.json.get('model_name')
+        prompt = request.json.get('prompt')
+
+        if not model_name:
+            return jsonify({"error": "Model name is required"}), 400
+
+        if not prompt:
+            return jsonify({"error": "Prompt is required"}), 400
 
         # Generate a synthetic image using the specified model
         output_path = generate_synthetic_image(prompt, model_name)
