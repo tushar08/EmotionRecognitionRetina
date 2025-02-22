@@ -1,8 +1,7 @@
 {
-    "total_frames_processed": 105,
-    "total_faces_detected": 2,
+    "total_frames_processed": 586,
+    "total_faces_detected": 1,
     "faces": [
-        "face_1",
-        "face_2"
+        "face_1"
     ]
 }

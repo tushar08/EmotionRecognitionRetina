@@ -1,3 +1,3 @@
-Most Common Emotion: neutral (10 times)
-Average Confidence: 46.27%
-Total Frames Processed: 20
+Most Common Emotion: neutral (13 times)
+Average Confidence: 65.08%
+Total Frames Processed: 33

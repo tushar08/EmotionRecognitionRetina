@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1, h2 {
+            color: #2c3e50;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            color: #34495e;
+        }
+
+        /* Buttons */
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Input Fields */
+        input[type="file"], input[type="number"], input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 10px;
+        }
+
+        /* Sections */
+        .upload-section, .webcam-section, .video-section, .stats-section, .login-section, .generative-ai-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        /* Video Preview */
+        video {
+            width: 100%;
+            max-width: 600px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        /* Statistics Output */
+        #statsOutput {
+            margin-top: 20px;
+        }
+
+        .face-stats {
+            margin-bottom: 20px;
+        }
+
+        .face-stats img {
+            max-width: 100px;
+            border-radius: 10px;
+            margin-right: 15px;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            display: none; /* Hide statistics by default */
+        }
+
+        /* Story Section */
+        .story-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .story-section p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .container > div {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Emotion Detection from Video</h1>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h2>Upload Video</h2>
+            <input type="file" id="videoFile" accept="video/*">
+            <button onclick="uploadVideo()">Upload Video</button>
+            <label for="frameInterval">Frame Interval:</label>
+            <input type="number" id="frameInterval" value="40" min="1">
+        </div>
+
+        <!-- Webcam Section -->
+        <div class="webcam-section">
+            <h2>Record Video</h2>
+            <button onclick="startRecording()">Record Video via Webcam</button>
+            <button onclick="stopRecording()">Stop Recording</button>
+            <label for="frameInterval">Frame Interval:</label>
+            <input type="number" id="frameInterval" value="40" min="1">
+        </div>
+
+        <!-- Video Preview Section -->
+        <div class="video-section">
+            <h2>Video Preview</h2>
+            <video id="webcamPreview" autoplay></video>
+            <video id="videoPlayer" controls style="display: none;"></video>
+            <button onclick="saveFrame()">Save Frame for Generative AI</button>
+        </div>
+
+        <!-- Statistics Section -->
+        <div class="stats-section">
+            <h2>Statistics</h2>
+            <div id="statsOutput"></div>
+        </div>
+
+        <!-- Story Section -->
+        <div class="story-section">
+            <h2>Emotion Story</h2>
+            <div id="storyOutput"></div>
+        </div>
+
+        <!-- Hugging Face Login Section -->
+        <div class="login-section">
+            <h2>Hugging Face Login</h2>
+            <input type="text" id="hfToken" placeholder="Enter Hugging Face Token">
+            <button onclick="loginHuggingFace()">Login</button>
+        </div>
+
+        <!-- Generative AI Section -->
+        <div class="generative-ai-section">
+            <h2>Generative AI</h2>
+            <button onclick="trainModel()">Train Generative Model</button>
+            <input type="text" id="modelName" value="stabilityai/stable-diffusion-2" placeholder="Enter model name (e.g., stabilityai/stable-diffusion-2)">
+            <input type="text" id="promptInput" value="A happy face" placeholder="Enter a prompt (e.g., 'A happy face')">
+            <button onclick="generateImage()">Generate Synthetic Image</button>
+        </div>
+    </div>
+
+    <script>
+        let videoBlob;
+        let mediaRecorder;
+        let recordedChunks = [];
+        const webcamPreview = document.getElementById('webcamPreview');
+        const videoPlayer = document.getElementById('videoPlayer');
+        async function loginHuggingFace() {
+            const token = document.getElementById('hfToken').value;
+            if (!token) {
+                alert("Please enter a Hugging Face token.");
+                return;
+            }
+            try {
+                const response = await fetch('/login_huggingface', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ token: token })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoFile');
+            const frameInterval = document.getElementById('frameInterval').value;
+            const statsOutput = document.getElementById('statsOutput');
+            if (fileInput.files.length === 0) {
+                alert("Please select a video file.");
+                return;
+            }
+            const formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+            formData.append('frame_interval', frameInterval);
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    // Display the video
+                    videoBlob = new Blob([fileInput.files[0]], { type: 'video/mp4' });
+                    videoPlayer.src = URL.createObjectURL(videoBlob);
+                    videoPlayer.style.display = 'block';
+                    webcamPreview.style.display = 'none';
+                    // Fetch and display statistics
+                    const statsResponse = await fetch(`/get_stats?stats_folder=${result.stats_folder}`);
+                    const stats = await statsResponse.json();
+                    displayStats(stats);
+                } else {
+                    statsOutput.textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                statsOutput.textContent = `Error: ${error.message}`;
+            }
+        }
+        async function startRecording() {
+            try {
+                // Access the webcam
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                webcamPreview.srcObject = stream;
+                webcamPreview.style.display = 'block';
+                videoPlayer.style.display = 'none';
+                // Initialize MediaRecorder
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+                mediaRecorder.onstop = saveRecording;
+                // Start recording
+                mediaRecorder.start();
+                document.querySelector('button[onclick="startRecording()"]').style.display = 'none';
+                document.querySelector('button[onclick="stopRecording()"]').style.display = 'inline';
+            } catch (error) {
+                alert(`Error accessing webcam: ${error.message}`);
+            }
+        }
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                document.querySelector('button[onclick="startRecording()"]').style.display = 'inline';
+                document.querySelector('button[onclick="stopRecording()"]').style.display = 'none';
+            }
+        }
+        async function saveRecording() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            recordedChunks = [];
+            // Save the recorded video
+            const formData = new FormData();
+            formData.append('video', blob, 'webcam_video.webm');
+            const frameInterval = document.getElementById('frameInterval').value;
+            formData.append('frame_interval', frameInterval);
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    // Display the recorded video
+                    videoBlob = blob;
+                    videoPlayer.src = URL.createObjectURL(videoBlob);
+                    videoPlayer.style.display = 'block';
+                    webcamPreview.style.display = 'none';
+                    // Fetch and display statistics
+                    const statsResponse = await fetch(`/get_stats?stats_folder=${result.stats_folder}`);
+                    const stats = await statsResponse.json();
+                    displayStats(stats);
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        function displayStats(stats) {
+            const statsOutput = document.getElementById('statsOutput');
+            statsOutput.innerHTML = '';
+            for (const [faceId, data] of Object.entries(stats)) {
+                const faceStats = document.createElement('div');
+                faceStats.className = 'face-stats';
+                // Display thumbnail
+                if (data.thumbnails && data.thumbnails.length > 0) {
+                    const thumbnail = document.createElement('img');
+                    thumbnail.src = `data:image/jpeg;base64,${data.thumbnails[0]}`;
+                    faceStats.appendChild(thumbnail);
+                }
+                // Display stats
+                const statsText = document.createElement('pre');
+                statsText.textContent = JSON.stringify(data, null, 2);
+                faceStats.appendChild(statsText);
+                statsOutput.appendChild(faceStats);
+            }
+        }
+        async function saveFrame() {
+            const videoPlayer = document.getElementById('videoPlayer');
+            const canvas = document.createElement('canvas');
+            canvas.width = videoPlayer.videoWidth;
+            canvas.height = videoPlayer.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+            // Convert the canvas image to a base64-encoded string
+            const frameData = canvas.toDataURL('image/jpeg');
+            try {
+                const response = await fetch('/save_frame', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ frame_data: frameData })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`Frame saved successfully: ${result.frame_path}`);
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        async function trainModel() {
+            try {
+                const response = await fetch('/train_generative_model', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`Generative model trained successfully: ${result.model_path}`);
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        async function generateImage() {
+            const modelName = document.getElementById('modelName').value;
+            const prompt = document.getElementById('promptInput').value;
+            if (!modelName) {
+                alert("Please enter a valid model name.");
+                return;
+            }
+            if (!prompt) {
+                alert("Please enter a prompt.");
+                return;
+            }
+            try {
+                const response = await fetch('/generate_synthetic_image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ model_name: modelName, prompt: prompt })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`Synthetic image generated successfully: ${result.output_path}`);
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        
+        // Function to toggle visibility of statistics
+        function toggleStats(faceId) {
+            const statsElement = document.getElementById(`stats-${faceId}`);
+            if (statsElement.style.display === "none" || !statsElement.style.display) {
+                statsElement.style.display = "block";
+            } else {
+                statsElement.style.display = "none";
+            }
+        }
+
+        // Function to display statistics
+        function displayStats(stats) {
+            const statsOutput = document.getElementById('statsOutput');
+            statsOutput.innerHTML = '';
+
+            for (const [faceId, data] of Object.entries(stats)) {
+                const faceStats = document.createElement('div');
+                faceStats.className = 'face-stats';
+
+                // Display thumbnail
+                if (data.thumbnails && data.thumbnails.length > 0) {
+                    const thumbnail = document.createElement('img');
+                    thumbnail.src = `data:image/jpeg;base64,${data.thumbnails[0]}`;
+                    faceStats.appendChild(thumbnail);
+                }
+
+                // Display face ID and toggle button
+                const faceHeader = document.createElement('div');
+                faceHeader.innerHTML = `<strong>Face ${faceId}</strong>`;
+                const toggleButton = document.createElement('button');
+                toggleButton.textContent = "Show Statistics";
+                toggleButton.onclick = () => toggleStats(faceId);
+                faceHeader.appendChild(toggleButton);
+                faceStats.appendChild(faceHeader);
+
+                // Display stats (hidden by default)
+                const statsText = document.createElement('pre');
+                statsText.id = `stats-${faceId}`;
+                statsText.textContent = JSON.stringify(data, null, 2);
+                faceStats.appendChild(statsText);
+
+                statsOutput.appendChild(faceStats);
+            }
+
+            // Display the story
+            displayStory(stats);
+        }
+    </script>
+</body>
+</html>

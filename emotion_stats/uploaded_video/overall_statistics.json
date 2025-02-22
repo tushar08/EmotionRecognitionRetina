@@ -1,0 +1,10 @@
+{
+    "total_frames_processed": 407,
+    "total_faces_detected": 4,
+    "faces": [
+        "face_1",
+        "face_2",
+        "face_3",
+        "face_4"
+    ]
+}

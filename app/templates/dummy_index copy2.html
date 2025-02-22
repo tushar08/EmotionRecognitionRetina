@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1,
+        h2 {
+            color: #2c3e50;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            color: #34495e;
+        }
+
+        /* Buttons */
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Input Fields */
+        input[type="file"],
+        input[type="number"],
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 10px;
+        }
+
+        /* Sections */
+        .upload-section,
+        .webcam-section,
+        .video-section,
+        .stats-section,
+        .login-section,
+        .generative-ai-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        /* Video Preview */
+        video {
+            width: 100%;
+            max-width: 600px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        /* Statistics Output */
+        #statsOutput {
+            margin-top: 20px;
+        }
+
+        .face-stats {
+            margin-bottom: 20px;
+        }
+
+        .face-stats img {
+            max-width: 100px;
+            border-radius: 10px;
+            margin-right: 15px;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            display: none;
+            /* Hide statistics by default */
+        }
+
+        /* Story Section */
+        .story-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .story-section p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .container>div {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Emotion Detection from Video</h1>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h2>Upload Video</h2>
+            <input type="file" id="videoFile" accept="video/*">
+            <button onclick="uploadVideo()">Upload Video</button>
+            <label for="frameInterval">Frame Interval:</label>
+            <input type="number" id="frameInterval" value="40" min="1">
+        </div>
+
+        <!-- Generate Statistics Section -->
+        <div class="stats-section">
+            <h2>Generate Statistics</h2>
+            <button onclick="generateStatistics()">Generate Statistics</button>
+            <div id="statsOutput"></div>
+        </div>
+
+        <!-- Video Preview Section -->
+        <div class="video-section">
+            <h2>Video Preview</h2>
+            <video id="webcamPreview" autoplay></video>
+            <video id="videoPlayer" controls style="display: none;"></video>
+            <button onclick="saveFrame()">Save Frame for Generative AI</button>
+        </div>
+
+        <!-- Story Section -->
+        <div class="story-section">
+            <h2>Emotion Story</h2>
+            <div id="storyOutput"></div>
+        </div>
+
+        <!-- Hugging Face Login Section -->
+        <div class="login-section">
+            <h2>Hugging Face Login</h2>
+            <input type="text" id="hfToken" placeholder="Enter Hugging Face Token">
+            <button onclick="loginHuggingFace()">Login</button>
+        </div>
+
+        <!-- Generative AI Section -->
+        <div class="generative-ai-section">
+            <h2>Generative AI</h2>
+            <button onclick="trainModel()">Train Generative Model</button>
+            <input type="text" id="modelName" value="stabilityai/stable-diffusion-2"
+                placeholder="Enter model name (e.g., stabilityai/stable-diffusion-2)">
+            <input type="text" id="promptInput" value="A happy face"
+                placeholder="Enter a prompt (e.g., 'A happy face')">
+            <button onclick="generateImage()">Generate Synthetic Image</button>
+        </div>
+    </div>
+
+    <script>
+        let uploadedVideoBlob = null;
+
+        // Function to upload video
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoFile');
+            if (fileInput.files.length === 0) {
+                alert("Please select a video file.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            uploadedVideoBlob = new Blob([file], { type: file.type });
+
+            // Display the uploaded video
+            const videoPlayer = document.getElementById('videoPlayer');
+            videoPlayer.src = URL.createObjectURL(uploadedVideoBlob);
+            videoPlayer.style.display = 'block';
+            document.getElementById('webcamPreview').style.display = 'none';
+
+            alert("Video uploaded successfully. Click 'Generate Statistics' to analyze.");
+        }
+
+        // Function to generate statistics
+        async function generateStatistics() {
+            if (!uploadedVideoBlob) {
+                alert("Please upload a video first.");
+                return;
+            }
+
+            const frameInterval = document.getElementById('frameInterval').value;
+            const statsOutput = document.getElementById('statsOutput');
+
+            const formData = new FormData();
+            formData.append('video', uploadedVideoBlob, 'uploaded_video.mp4');
+            formData.append('frame_interval', frameInterval);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log("Server response (upload):", result); // Log the upload response
+
+                if (response.ok) {
+                    // Fetch and display statistics
+                    const statsResponse = await fetch(`/get_stats?stats_folder=${result.stats_folder}`);
+                    const stats = await statsResponse.json();
+                    console.log("Statistics data:", stats); // Log the statistics data
+
+                    // Ensure stats is an object before passing it to displayStats
+                    if (stats && typeof stats === 'object' && !Array.isArray(stats)) {
+                        displayStats(stats);
+                    } else {
+                        statsOutput.textContent = "Invalid statistics data received from the server.";
+                    }
+                } else {
+                    statsOutput.textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                statsOutput.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Function to toggle visibility of statistics
+        function toggleStats(faceId) {
+            const statsElement = document.getElementById(`stats-${faceId}`);
+            if (statsElement.style.display === "none" || !statsElement.style.display) {
+                statsElement.style.display = "block";
+            } else {
+                statsElement.style.display = "none";
+            }
+        }
+
+        // Function to display statistics
+        function displayStats(stats) {
+            const statsOutput = document.getElementById('statsOutput');
+            statsOutput.innerHTML = '';
+
+            // Check if stats is defined and is an object
+            if (!stats || typeof stats !== 'object' || Array.isArray(stats)) {
+                statsOutput.textContent = "No statistics available or invalid data format.";
+                return;
+            }
+
+            // Check if stats has at least one face
+            if (Object.keys(stats).length === 0) {
+                statsOutput.textContent = "No faces detected in the video.";
+                return;
+            }
+
+            // Iterate over the stats object
+            for (const [faceId, data] of Object.entries(stats)) {
+                const faceStats = document.createElement('div');
+                faceStats.className = 'face-stats';
+
+                // Display thumbnail
+                if (data.thumbnails && data.thumbnails.length > 0) {
+                    const thumbnail = document.createElement('img');
+                    thumbnail.src = `data:image/jpeg;base64,${data.thumbnails[0]}`;
+                    faceStats.appendChild(thumbnail);
+                }
+
+                // Display face ID and toggle button
+                const faceHeader = document.createElement('div');
+                faceHeader.innerHTML = `<strong>Face ${faceId}</strong>`;
+                const toggleButton = document.createElement('button');
+                toggleButton.textContent = "Show Statistics";
+                toggleButton.onclick = () => toggleStats(faceId);
+                faceHeader.appendChild(toggleButton);
+                faceStats.appendChild(faceHeader);
+
+                // Display stats (hidden by default)
+                const statsText = document.createElement('pre');
+                statsText.id = `stats-${faceId}`;
+                statsText.textContent = JSON.stringify(data, null, 2);
+                faceStats.appendChild(statsText);
+
+                statsOutput.appendChild(faceStats);
+            }
+
+            // Display the story
+            displayStory(stats);
+        }
+
+        function displayStory(stats) {
+            const storyOutput = document.getElementById('storyOutput');
+            storyOutput.innerHTML = '';
+
+            // Check if stats is defined and is an object
+            if (!stats || typeof stats !== 'object' || Array.isArray(stats)) {
+                storyOutput.textContent = "No story available due to invalid data.";
+                return;
+            }
+
+            // Check if stats has at least one face
+            if (Object.keys(stats).length === 0) {
+                storyOutput.textContent = "No faces detected in the video.";
+                return;
+            }
+
+            let story = "";
+
+            // Iterate over the stats object
+            for (const [faceId, data] of Object.entries(stats)) {
+                const mostCommonEmotion = data.most_common_emotion;
+                const emotionCounts = data.emotion_counts;
+                const averageConfidences = data.average_confidences;
+                const averageAge = data.average_age;
+                const averageRace = data.average_race;
+
+                story += `<p><strong>Face ${faceId}:</strong> `;
+                story += `This person appears to be around <strong>${Math.round(averageAge)} years old</strong>. `;
+
+                // Check if averageRace is defined and is an object
+                if (averageRace && typeof averageRace === 'object' && Object.keys(averageRace).length > 0) {
+                    const predominantRace = Object.keys(averageRace).reduce((a, b) => averageRace[a] > averageRace[b] ? a : b);
+                    story += `Their predominant racial identity is <strong>${predominantRace}</strong>. `;
+                } else {
+                    story += `Their racial identity could not be determined. `;
+                }
+
+                // Check if emotionCounts and mostCommonEmotion are defined
+                if (emotionCounts && mostCommonEmotion && emotionCounts[mostCommonEmotion]) {
+                    story += `The most common emotion detected was <strong>${mostCommonEmotion}</strong>. `;
+                    story += `This emotion appeared in <strong>${emotionCounts[mostCommonEmotion]}</strong> out of <strong>${data.total_frames_processed}</strong> frames. `;
+                } else {
+                    story += `The most common emotion could not be determined. `;
+                }
+
+                // Check if averageConfidences and mostCommonEmotion are defined
+                if (averageConfidences && mostCommonEmotion && averageConfidences[mostCommonEmotion]) {
+                    story += `The average confidence for this emotion was <strong>${averageConfidences[mostCommonEmotion].toFixed(2)}%</strong>. `;
+                } else {
+                    story += `The average confidence for this emotion could not be determined. `;
+                }
+
+                if (mostCommonEmotion === "happy") {
+                    story += `This suggests that the person was generally in a positive and cheerful mood. `;
+                } else if (mostCommonEmotion === "sad") {
+                    story += `This indicates that the person was often feeling down or melancholic. `;
+                } else if (mostCommonEmotion === "angry") {
+                    story += `This points to moments of frustration or anger. `;
+                } else if (mostCommonEmotion === "surprise") {
+                    story += `This shows that the person was frequently surprised or startled. `;
+                } else if (mostCommonEmotion === "neutral") {
+                    story += `This suggests that the person was mostly calm and composed. `;
+                }
+                // Check if emotionCounts is a non-empty object
+                if (emotionCounts && typeof emotionCounts === 'object' && Object.keys(emotionCounts).length > 0) {
+                    const otherEmotions = Object.keys(emotionCounts).filter(e => e !== mostCommonEmotion);
+                    if (otherEmotions.length > 0) {
+                        const otherEmotionsString = otherEmotions
+                            .map(e => {
+                                // Check if emotionCounts[e] is defined
+                                if (emotionCounts[e] !== undefined) {
+                                    return `<strong>${e}</strong> (${emotionCounts[e]} frames)`;
+                                } else {
+                                    return null; // Skip this emotion if the count is undefined
+                                }
+                            })
+                            .filter(Boolean) // Remove null values from the array
+                            .join(", ");
+
+                        if (otherEmotionsString.length > 0) {
+                            story += `Other emotions detected include: ${otherEmotionsString}. `;
+                        }
+                    }
+                }
+
+                // Add face interactions
+                if (data.interactions && data.interactions.length > 0 && data.interactions[0]) {
+                    story += `This person interacted with other faces in the video. `;
+                    story += `For example, they were seen interacting with <strong>Face ${data.interactions[0].with_face}</strong> for <strong>${data.interactions[0].duration} seconds</strong>, during which their emotion was predominantly <strong>${data.interactions[0].emotion}</strong>. `;
+                }
+
+                story += `</p>`;
+            }
+
+            storyOutput.innerHTML = story;
+        }
+    </script>
+</body>
+
+</html>
